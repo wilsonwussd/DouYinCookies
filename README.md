@@ -8,6 +8,7 @@
 - 🔄 自动转换Cookies格式
 - 💾 自动保存Cookies
 - ✅ 验证Cookies有效性
+- 📎 一键复制有效Cookies
 - 🔒 安全的本地存储
 
 ## 使用方法
@@ -37,8 +38,10 @@ python main.py
 - 点击 "导入Cookies" 按钮
 - 等待导入完成
 
-6. 验证Cookies：
+6. 验证和使用Cookies：
 - 点击 "验证Cookies" 按钮检查有效性
+- 点击 "复制Cookies" 按钮获取格式化的Cookies字符串
+- 复制的Cookies可直接用于浏览器或其他工具
 
 ## 项目结构
 

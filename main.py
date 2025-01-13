@@ -5,13 +5,15 @@ import os
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 import json
+import re
+import requests
 from utils.cookie_manager import CookieManager
 
 class DouYinCookieManager:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("抖音Cookies管理工具")
-        self.root.geometry("600x700")
+        self.root.geometry("600x800")
         
         self.cookie_manager = CookieManager()
         
@@ -32,6 +34,8 @@ class DouYinCookieManager:
 5. 复制导出的JSON内容
 6. 粘贴到下方文本框中
 7. 点击 '导入Cookies' 按钮
+8. 验证成功后可点击 '复制Cookies' 获取格式化的Cookie字符串
+9. 在下方输入抖音分享链接，点击解析获取视频ID
         """
         instruction_label = tk.Label(self.root, text=instruction_text, justify=tk.LEFT, font=("Arial", 10))
         instruction_label.pack(pady=10, padx=20)
@@ -60,18 +64,138 @@ class DouYinCookieManager:
         self.verify_button = tk.Button(button_frame, text="验证Cookies", command=self.verify_cookies)
         self.verify_button.pack(side=tk.LEFT, padx=10)
         
+        # 创建复制按钮
+        self.copy_button = tk.Button(button_frame, text="复制Cookies", command=self.copy_cookies)
+        self.copy_button.pack(side=tk.LEFT, padx=10)
+        
         # 创建清除按钮
         self.clear_button = tk.Button(button_frame, text="清除内容", command=self.clear_text)
         self.clear_button.pack(side=tk.LEFT, padx=10)
+        
+        # 创建分享链接框架
+        share_frame = tk.Frame(self.root)
+        share_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # 创建分享链接标签
+        share_label = tk.Label(share_frame, text="抖音分享链接：", font=("Arial", 10))
+        share_label.pack(side=tk.LEFT)
+        
+        # 创建分享链接输入框
+        self.share_entry = tk.Entry(share_frame, width=40)
+        self.share_entry.pack(side=tk.LEFT, padx=5)
+        
+        # 创建解析按钮
+        self.parse_button = tk.Button(share_frame, text="解析链接", command=self.parse_share_link)
+        self.parse_button.pack(side=tk.LEFT, padx=5)
+        
+        # 创建视频ID框架
+        video_id_frame = tk.Frame(self.root)
+        video_id_frame.pack(fill=tk.X, padx=20, pady=5)
+        
+        # 创建视频ID标签
+        video_id_label = tk.Label(video_id_frame, text="视频ID：", font=("Arial", 10))
+        video_id_label.pack(side=tk.LEFT)
+        
+        # 创建视频ID显示框
+        self.video_id_var = tk.StringVar()
+        self.video_id_entry = tk.Entry(video_id_frame, textvariable=self.video_id_var, width=30, state='readonly')
+        self.video_id_entry.pack(side=tk.LEFT, padx=5)
+        
+        # 创建复制视频ID按钮
+        self.copy_id_button = tk.Button(video_id_frame, text="复制ID", command=self.copy_video_id)
+        self.copy_id_button.pack(side=tk.LEFT, padx=5)
         
         # 创建状态标签
         self.status_label = tk.Label(self.root, text="等待操作...", font=("Arial", 10))
         self.status_label.pack(pady=20)
         
+    def parse_share_link(self):
+        """解析抖音分享链接"""
+        try:
+            share_text = self.share_entry.get().strip()
+            if not share_text:
+                self.status_label.config(text="请输入分享链接")
+                messagebox.showwarning("警告", "请输入分享链接")
+                return
+                
+            # 使用正则表达式提取链接
+            match = re.search(r'https://v\.douyin\.com/[a-zA-Z0-9]+/?', share_text)
+            if not match:
+                self.status_label.config(text="未找到有效的分享链接")
+                messagebox.showwarning("警告", "未找到有效的分享链接")
+                return
+                
+            share_url = match.group()
+            
+            # 获取重定向后的URL
+            response = requests.get(share_url, allow_redirects=True)
+            final_url = response.url
+            
+            # 从最终URL中提取视频ID
+            video_id_match = re.search(r'/video/(\d+)', final_url)
+            if not video_id_match:
+                self.status_label.config(text="无法解析视频ID")
+                messagebox.showerror("错误", "无法从链接中解析视频ID")
+                return
+                
+            video_id = video_id_match.group(1)
+            self.video_id_var.set(video_id)
+            self.status_label.config(text="成功解析视频ID")
+            
+        except Exception as e:
+            print(f"解析分享链接时出错: {str(e)}")
+            self.status_label.config(text="解析分享链接时出错")
+            messagebox.showerror("错误", f"解析分享链接时出错: {str(e)}")
+            
+    def copy_video_id(self):
+        """复制视频ID到剪贴板"""
+        video_id = self.video_id_var.get()
+        if video_id:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(video_id)
+            self.status_label.config(text="视频ID已复制到剪贴板")
+            messagebox.showinfo("成功", "视频ID已复制到剪贴板！")
+        else:
+            self.status_label.config(text="没有可复制的视频ID")
+            messagebox.showwarning("警告", "没有可复制的视频ID")
+            
     def clear_text(self):
         """清除文本框内容"""
         self.cookie_text.delete(1.0, tk.END)
-        self.status_label.config(text="文本框已清空")
+        self.share_entry.delete(0, tk.END)
+        self.video_id_var.set("")
+        self.status_label.config(text="内容已清空")
+        
+    def copy_cookies(self):
+        """复制已保存的有效Cookies"""
+        try:
+            # 加载保存的cookies
+            cookies = self.cookie_manager.load_cookies()
+            if not cookies:
+                self.status_label.config(text="未找到保存的Cookies")
+                messagebox.showwarning("警告", "未找到保存的Cookies")
+                return
+                
+            # 验证cookies是否有效
+            if not self.cookie_manager.verify_cookies(cookies):
+                self.status_label.config(text="Cookies已失效，请重新导入")
+                messagebox.warning("警告", "Cookies已失效，请重新导入")
+                return
+                
+            # 将cookies转换为字符串格式
+            cookie_str = '; '.join([f"{k}={v}" for k, v in cookies.items()])
+            
+            # 复制到剪贴板
+            self.root.clipboard_clear()
+            self.root.clipboard_append(cookie_str)
+            
+            self.status_label.config(text="Cookies已复制到剪贴板")
+            messagebox.showinfo("成功", "Cookies已复制到剪贴板！")
+            
+        except Exception as e:
+            print(f"复制Cookies时出错: {str(e)}")
+            self.status_label.config(text="复制Cookies时出错")
+            messagebox.showerror("错误", f"复制Cookies时出错: {str(e)}")
         
     def import_cookies(self):
         """导入Cookies"""
